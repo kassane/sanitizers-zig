@@ -1,0 +1,25 @@
+name: Zig build
+
+on: [push]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on: [ubuntu-latest]
+    runs-on: ${{ matrix.runs-on }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+ 
+      - name: Download & Extract packages
+        run: |
+          curl -LO https://github.com/kassane/zig-mos-bootstrap/releases/download/0.2/zig-mos-x86_64-linux-musl-baseline.tar.xz
+          tar -xf zig-mos-x86_64-linux-musl-baseline.tar.xz
+          echo "$PWD/zig-mos-x86_64-linux-musl-baseline" >> $GITHUB_PATH
+
+      - name: Build
+        run: zig build rtsan -Dtests --summary all -freference-trace
