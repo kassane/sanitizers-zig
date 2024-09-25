@@ -1,60 +1,8 @@
 const std = @import("std");
 
 pub fn build(b: *std.Build) void {
-    const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{});
-
-    const tests = b.option(bool, "tests", "build tests") orelse false;
-
-    // FIXME
-    // {
-    //     const exe = b.addExecutable(.{
-    //         .name = "test-asan",
-    //         .target = target,
-    //         .optimize = optimize,
-    //     });
-    //     exe.addCSourceFile(.{
-    //         .file = b.path("tests/vec_test.cc"),
-    //         .flags = &.{"-fsanitize=address"},
-    //     });
-    //     buildASan(b, exe);
-
-    //     if (tests) {
-    //         b.installArtifact(exe);
-    //         const run = b.addRunArtifact(exe);
-    //         const run_step = b.step("asan", "Run the test-asan test");
-    //         run_step.dependOn(&run.step);
-    //     }
-    // }
-    // LLVM 20
-    {
-        const libzig = b.addStaticLibrary(.{
-            .name = "zig",
-            .target = target,
-            .optimize = optimize,
-            .root_source_file = b.path("tests/array.zig"),
-        });
-        libzig.linkLibC();
-
-        const exe = b.addExecutable(.{
-            .name = "test-rtsan",
-            .target = target,
-            .optimize = optimize,
-        });
-        exe.linkLibrary(libzig);
-        exe.addCSourceFile(.{
-            .file = b.path("tests/vec_test.cc"),
-            .flags = &.{"-fsanitize=realtime"},
-        });
-        buildRTSan(b, exe);
-
-        if (tests) {
-            b.installArtifact(exe);
-            const run = b.addRunArtifact(exe);
-            const run_step = b.step("rtsan", "Run the test-rtsan test");
-            run_step.dependOn(&run.step);
-        }
-    }
+    _ = b; // autofix
+    // TODO
 }
 
 pub fn buildASan(b: *std.Build, lib: *std.Build.Step.Compile) void {
@@ -337,7 +285,7 @@ fn buildSanCommon(lib: *std.Build.Step.Compile, dependency: ?*std.Build.Dependen
             "sanitizer_tls_get_addr.cpp",
             "sanitizer_type_traits.cpp",
             // "symbolizer/sanitizer_symbolize.cpp", // need LLVM headers
-            "symbolizer/sanitizer_wrappers.cpp",
+            // "symbolizer/sanitizer_wrappers.cpp",
         },
         .flags = cxxflags,
     });

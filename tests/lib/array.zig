@@ -9,7 +9,11 @@ fn array() callconv(.C) void {
     //              `posix_memalign` in real-time context!
     // page_allocator (no-libc/syscalls): None
 
-    var arr = std.ArrayList([]const u8).init(std.heap.raw_c_allocator);
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var arr = std.ArrayList([]const u8).init(allocator);
     defer arr.deinit();
     arr.append("foo") catch unreachable;
     arr.append("bar") catch unreachable;
@@ -17,7 +21,7 @@ fn array() callconv(.C) void {
 }
 
 fn openfile() callconv(.C) void {
-    const file = std.fs.cwd().openFile("tests/malloc.d", .{}) catch unreachable;
+    const file = std.fs.cwd().openFile("build.zig.zon", .{}) catch unreachable;
     defer file.close();
 }
 

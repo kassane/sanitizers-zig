@@ -30,7 +30,7 @@ jobs:
           echo "$PWD/zig-mos-aarch64-macos-apple_m1" >> $GITHUB_PATH
 
       - name: Build
-        run: zig build -Dtests --summary all -freference-trace
+        run: zig build --build-file $PWD/tests/build.zig --summary all -freference-trace
 
       - name: Run
-        run: zig build rtsan -Dtests -freference-trace
+        run: zig build rtsan --build-file $PWD/tests/build.zig -freference-trace
