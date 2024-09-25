@@ -1,4 +1,4 @@
-name: Zig build
+name: Build & Test
 
 on: [push]
 
@@ -7,7 +7,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runs-on: [ubuntu-latest]
+        runs-on: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.runs-on }}
     steps:
       - uses: actions/checkout@v4
@@ -15,11 +15,22 @@ jobs:
           submodules: recursive
           fetch-depth: 0
  
-      - name: Download & Extract packages
+      - name: Download & Extract packages (Linux)
+        if: startsWith(matrix.runs-on, 'ubuntu')
         run: |
           curl -LO https://github.com/kassane/zig-mos-bootstrap/releases/download/0.2/zig-mos-x86_64-linux-musl-baseline.tar.xz
           tar -xf zig-mos-x86_64-linux-musl-baseline.tar.xz
           echo "$PWD/zig-mos-x86_64-linux-musl-baseline" >> $GITHUB_PATH
+      
+      - name: Download & Extract packages (MacOS M1)
+        if: startsWith(matrix.runs-on, 'macos')
+        run: |
+          curl -LO https://github.com/kassane/zig-mos-bootstrap/releases/download/0.2/zig-mos-aarch64-macos-apple_m1.tar.xz
+          tar -xf zig-mos-aarch64-macos-apple_m1.tar.xz
+          echo "$PWD/zig-mos-aarch64-macos-apple_m1" >> $GITHUB_PATH
 
       - name: Build
-        run: zig build rtsan -Dtests --summary all -freference-trace
+        run: zig build -Dtests --summary all -freference-trace
+
+      - name: Run
+        run: zig build rtsan -Dtests -freference-trace

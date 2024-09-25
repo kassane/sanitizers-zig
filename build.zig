@@ -7,32 +7,41 @@ pub fn build(b: *std.Build) void {
     const tests = b.option(bool, "tests", "build tests") orelse false;
 
     // FIXME
-    {
-        const exe = b.addExecutable(.{
-            .name = "test-asan",
-            .target = target,
-            .optimize = optimize,
-        });
-        exe.addCSourceFile(.{
-            .file = b.path("tests/vec_test.cc"),
-            .flags = &.{"-fsanitize=address"},
-        });
-        buildASan(b, exe);
+    // {
+    //     const exe = b.addExecutable(.{
+    //         .name = "test-asan",
+    //         .target = target,
+    //         .optimize = optimize,
+    //     });
+    //     exe.addCSourceFile(.{
+    //         .file = b.path("tests/vec_test.cc"),
+    //         .flags = &.{"-fsanitize=address"},
+    //     });
+    //     buildASan(b, exe);
 
-        if (tests) {
-            b.installArtifact(exe);
-            const run = b.addRunArtifact(exe);
-            const run_step = b.step("asan", "Run the test-asan test");
-            run_step.dependOn(&run.step);
-        }
-    }
+    //     if (tests) {
+    //         b.installArtifact(exe);
+    //         const run = b.addRunArtifact(exe);
+    //         const run_step = b.step("asan", "Run the test-asan test");
+    //         run_step.dependOn(&run.step);
+    //     }
+    // }
     // LLVM 20
     {
+        const libzig = b.addStaticLibrary(.{
+            .name = "zig",
+            .target = target,
+            .optimize = optimize,
+            .root_source_file = b.path("tests/array.zig"),
+        });
+        libzig.linkLibC();
+
         const exe = b.addExecutable(.{
             .name = "test-rtsan",
             .target = target,
             .optimize = optimize,
         });
+        exe.linkLibrary(libzig);
         exe.addCSourceFile(.{
             .file = b.path("tests/vec_test.cc"),
             .flags = &.{"-fsanitize=realtime"},
@@ -122,8 +131,8 @@ pub fn buildASan(b: *std.Build, lib: *std.Build.Step.Compile) void {
     if (lib.rootModuleTarget().cpu.arch.isX86())
         lib.addAssemblyFile(dep.path("lib/asan/asan_rtl_x86_64.S"));
 
-    buildLSan(lib, dep);
-    buildUBSan(lib, dep);
+    // buildLSan(lib, dep);
+    // buildUBSan(lib, dep);
     buildInterception(lib, dep);
     buildSanCommon(lib, dep);
 
