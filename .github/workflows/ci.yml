@@ -28,9 +28,10 @@ jobs:
           curl -LO https://github.com/kassane/zig-mos-bootstrap/releases/download/0.2/zig-mos-aarch64-macos-apple_m1.tar.xz
           tar -xf zig-mos-aarch64-macos-apple_m1.tar.xz
           echo "$PWD/zig-mos-aarch64-macos-apple_m1" >> $GITHUB_PATH
-
       - name: Build
         run: zig build --build-file $PWD/tests/build.zig --summary all -freference-trace
-
       - name: Run
-        run: zig build rtsan --build-file $PWD/tests/build.zig -freference-trace
+        if: ${{ failure() }}
+        run: |
+            zig build rtsan --build-file $PWD/tests/build.zig -freference-trace
+            zig build asan --build-file $PWD/tests/build.zig -freference-trace

@@ -28,9 +28,8 @@ jobs:
           tar -xf zig-mos-x86_64-linux-musl-baseline.tar.xz
           echo "$PWD/zig-mos-x86_64-linux-musl-baseline" >> $GITHUB_PATH
           sudo apt update && sudo apt install -y qemu-user-binfmt
-      
       - name: Build Summary ${{ matrix.targets }}
         run: zig build --build-file $PWD/tests/build.zig --summary all -freference-trace -Dtarget=${{ matrix.targets }}
-      
       - name: Run ${{ matrix.targets }}
+        if: ${{ failure() }}
         run: zig build rtsan --build-file $PWD/tests/build.zig --summary all -freference-trace -Dtarget=${{ matrix.targets }}

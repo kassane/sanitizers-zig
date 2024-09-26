@@ -1,12 +1,19 @@
 const std = @import("std");
 
 pub fn build(b: *std.Build) void {
-    _ = b; // autofix
-    // TODO
+    _ = RTSanModule(b);
+}
+
+pub fn RTSanModule(b: *std.Build) *std.Build.Module {
+    return b.addModule("rtsan", .{
+        .root_source_file = b.path("bindings/rtsan.zig"),
+    });
 }
 
 pub fn buildASan(b: *std.Build, lib: *std.Build.Step.Compile) void {
     const dep = b.dependency("compiler-rt", .{});
+    lib.root_module.sanitize_c = false;
+    if (!lib.root_module.resolved_target.?.query.isNative()) lib.linkage = .dynamic;
 
     lib.addIncludePath(dep.path("include"));
     lib.addIncludePath(dep.path("lib"));
@@ -66,11 +73,55 @@ pub fn buildASan(b: *std.Build, lib: *std.Build.Step.Compile) void {
         },
         .flags = cxxflags,
     });
+    // lib.addCSourceFiles(.{
+    //     .root = dep.path("lib/asan_abi"),
+    //     .files = &.{
+    //         "asan_abi.cpp",
+    //         // "asan_abi_shim.cpp",
+    //     },
+    //     .flags = cxxflags,
+    // });
     lib.addCSourceFiles(.{
-        .root = dep.path("lib/asan_abi"),
+        .root = dep.path("lib/lsan"),
+        .files = switch (lib.rootModuleTarget().os.tag) {
+            .linux => &.{
+                "lsan_linux.cpp",
+                "lsan_common_linux.cpp",
+            },
+            .macos => &.{
+                "lsan_mac.cpp",
+                "lsan_common_mac.cpp",
+                "lsan_malloc_mac.cpp",
+            },
+            .fuchsia => &.{
+                "lsan_common_fuchsia.cpp",
+                "lsan_fuchsia.cpp",
+            },
+            else => @panic("unsupported os"),
+        },
+        .flags = cxxflags,
+    });
+    lib.addCSourceFiles(.{
+        .root = dep.path("lib/lsan"),
         .files = &.{
-            "asan_abi.cpp",
-            // "asan_abi_shim.cpp",
+            "lsan_common.cpp",
+        },
+        .flags = cxxflags,
+    });
+    lib.addCSourceFiles(.{
+        .root = dep.path("lib/ubsan"),
+        .files = &.{
+            "ubsan_diag.cpp",
+            "ubsan_flags.cpp",
+            "ubsan_init.cpp",
+            "ubsan_monitor.cpp",
+            "ubsan_type_hash.cpp",
+            "ubsan_type_hash_itanium.cpp",
+            "ubsan_type_hash_win.cpp",
+            "ubsan_value.cpp",
+            "ubsan_win_dll_thunk.cpp",
+            "ubsan_win_dynamic_runtime_thunk.cpp",
+            "ubsan_win_weak_interception.cpp",
         },
         .flags = cxxflags,
     });
@@ -78,21 +129,19 @@ pub fn buildASan(b: *std.Build, lib: *std.Build.Step.Compile) void {
         lib.addAssemblyFile(dep.path("lib/asan/asan_interceptors_vfork.S"));
     if (lib.rootModuleTarget().cpu.arch.isX86())
         lib.addAssemblyFile(dep.path("lib/asan/asan_rtl_x86_64.S"));
-
-    // buildLSan(lib, dep);
-    // buildUBSan(lib, dep);
-    buildInterception(lib, dep);
-    buildSanCommon(lib, dep);
-
     if (lib.rootModuleTarget().abi != .msvc) {
         lib.linkLibCpp();
     } else {
         lib.linkLibC();
     }
+    buildInterception(lib, dep);
+    buildSanCommon(lib, dep);
 }
 
-pub fn buildLSan(lib: *std.Build.Step.Compile, dependency: ?*std.Build.Dependency) void {
-    const dep = dependency orelse @panic("compiler-rt dependency not provided");
+pub fn buildLSan(b: *std.Build, lib: *std.Build.Step.Compile) void {
+    const dep = b.dependency("compiler-rt", .{});
+    lib.root_module.sanitize_c = false;
+    if (!lib.root_module.resolved_target.?.query.isNative()) lib.linkage = .dynamic;
 
     lib.addIncludePath(dep.path("include"));
     lib.addIncludePath(dep.path("lib"));
@@ -112,7 +161,7 @@ pub fn buildLSan(lib: *std.Build.Step.Compile, dependency: ?*std.Build.Dependenc
                 "lsan_common_fuchsia.cpp",
                 "lsan_fuchsia.cpp",
             },
-            else => &.{},
+            else => @panic("unsupported os"),
         },
         .flags = cxxflags,
     });
@@ -129,6 +178,13 @@ pub fn buildLSan(lib: *std.Build.Step.Compile, dependency: ?*std.Build.Dependenc
         },
         .flags = cxxflags,
     });
+    if (lib.rootModuleTarget().abi != .msvc) {
+        lib.linkLibCpp();
+    } else {
+        lib.linkLibC();
+    }
+    buildInterception(lib, dep);
+    buildSanCommon(lib, dep);
 }
 
 fn buildInterception(lib: *std.Build.Step.Compile, dependency: ?*std.Build.Dependency) void {
@@ -161,8 +217,36 @@ fn buildInterception(lib: *std.Build.Step.Compile, dependency: ?*std.Build.Depen
 fn buildSanCommon(lib: *std.Build.Step.Compile, dependency: ?*std.Build.Dependency) void {
     const dep = dependency orelse @panic("compiler-rt dependency not provided");
 
+    const has_libc = lib.root_module.link_libc orelse false;
+    const has_libcpp = lib.root_module.link_libcpp orelse false;
+    const has_linked = if (lib.rootModuleTarget().abi != .msvc)
+        has_libcpp
+    else
+        has_libc;
+
+    const need_libc = if (has_linked) &[_][]const u8{
+        "sanitizer_posix_libcdep.cpp",
+        "sanitizer_symbolizer_posix_libcdep.cpp",
+        "sanitizer_linux_libcdep.cpp",
+        "sanitizer_stoptheworld_linux_libcdep.cpp",
+        "sanitizer_unwind_linux_libcdep.cpp",
+        "sanitizer_mac_libcdep.cpp",
+        "sanitizer_stoptheworld_netbsd_libcdep.cpp",
+        "sanitizer_common_libcdep.cpp",
+        "sanitizer_coverage_libcdep_new.cpp",
+        "sanitizer_stacktrace_libcdep.cpp",
+        "sanitizer_symbolizer_libcdep.cpp",
+    } else &[_][]const u8{
+        "sanitizer_common_nolibc.cpp",
+    };
+
     lib.addIncludePath(dep.path("include"));
     lib.addIncludePath(dep.path("lib"));
+    lib.addCSourceFiles(.{
+        .root = dep.path("lib/sanitizer_common"),
+        .files = need_libc,
+        .flags = cxxflags,
+    });
     lib.addCSourceFiles(.{
         .root = dep.path("lib/sanitizer_common"),
         .files = switch (lib.rootModuleTarget().os.tag) {
@@ -179,44 +263,31 @@ fn buildSanCommon(lib: *std.Build.Step.Compile, dependency: ?*std.Build.Dependen
                 "sanitizer_platform_limits_freebsd.cpp",
                 "sanitizer_procmaps_bsd.cpp",
                 "sanitizer_posix.cpp",
-                "sanitizer_posix_libcdep.cpp",
                 "sanitizer_platform_limits_posix.cpp",
-                "sanitizer_symbolizer_posix_libcdep.cpp",
             },
             .linux => &.{
-                "sanitizer_linux_libcdep.cpp",
                 if (lib.rootModuleTarget().cpu.arch == .s390x)
                     "sanitizer_linux_s390.cpp"
                 else
                     "sanitizer_linux.cpp",
                 "sanitizer_posix.cpp",
-                "sanitizer_posix_libcdep.cpp",
                 "sanitizer_platform_limits_linux.cpp",
                 "sanitizer_platform_limits_posix.cpp",
                 "sanitizer_procmaps_linux.cpp",
-                "sanitizer_stoptheworld_linux_libcdep.cpp",
-                "sanitizer_unwind_linux_libcdep.cpp",
-                "sanitizer_symbolizer_posix_libcdep.cpp",
             },
             .macos => &.{
                 "sanitizer_mac.cpp",
-                "sanitizer_mac_libcdep.cpp",
                 "sanitizer_posix.cpp",
-                "sanitizer_posix_libcdep.cpp",
                 "sanitizer_procmaps_mac.cpp",
                 "sanitizer_stoptheworld_mac.cpp",
                 "sanitizer_symbolizer_mac.cpp",
                 "sanitizer_platform_limits_posix.cpp",
-                "sanitizer_symbolizer_posix_libcdep.cpp",
             },
             .netbsd => &.{
                 "sanitizer_netbsd.cpp",
                 "sanitizer_platform_limits_netbsd.cpp",
                 "sanitizer_procmaps_bsd.cpp",
                 "sanitizer_posix.cpp",
-                "sanitizer_posix_libcdep.cpp",
-                "sanitizer_stoptheworld_netbsd_libcdep.cpp",
-                "sanitizer_symbolizer_posix_libcdep.cpp",
             },
             .solaris => &.{
                 "sanitizer_platform_limits_solaris.cpp",
@@ -249,9 +320,6 @@ fn buildSanCommon(lib: *std.Build.Step.Compile, dependency: ?*std.Build.Dependen
             "sanitizer_allocator_report.cpp",
             "sanitizer_chained_origin_depot.cpp",
             "sanitizer_common.cpp",
-            "sanitizer_common_libcdep.cpp",
-            // "sanitizer_common_nolibc.cpp",
-            "sanitizer_coverage_libcdep_new.cpp",
             "sanitizer_deadlock_detector1.cpp",
             "sanitizer_deadlock_detector2.cpp",
             "sanitizer_dl.cpp",
@@ -271,12 +339,10 @@ fn buildSanCommon(lib: *std.Build.Step.Compile, dependency: ?*std.Build.Dependen
                 "sanitizer_stacktrace_sparc.cpp"
             else
                 "sanitizer_stacktrace.cpp",
-            "sanitizer_stacktrace_libcdep.cpp",
             "sanitizer_stacktrace_printer.cpp",
             "sanitizer_suppressions.cpp",
             "sanitizer_symbolizer.cpp",
             "sanitizer_symbolizer_libbacktrace.cpp",
-            "sanitizer_symbolizer_libcdep.cpp",
             "sanitizer_symbolizer_markup.cpp",
             "sanitizer_symbolizer_report.cpp",
             "sanitizer_termination.cpp",
@@ -291,8 +357,10 @@ fn buildSanCommon(lib: *std.Build.Step.Compile, dependency: ?*std.Build.Dependen
     });
 }
 
-fn buildUBSan(lib: *std.Build.Step.Compile, dependency: ?*std.Build.Dependency) void {
-    const dep = dependency orelse @panic("compiler-rt dependency not provided");
+pub fn buildUBSan(b: *std.Build, lib: *std.Build.Step.Compile) void {
+    const dep = b.dependency("compiler-rt", .{});
+    lib.root_module.sanitize_c = false;
+
     lib.addIncludePath(dep.path("include"));
     lib.addIncludePath(dep.path("lib"));
     lib.addCSourceFiles(.{
@@ -315,10 +383,16 @@ fn buildUBSan(lib: *std.Build.Step.Compile, dependency: ?*std.Build.Dependency) 
             "ubsan_win_dll_thunk.cpp",
             "ubsan_win_dynamic_runtime_thunk.cpp",
             "ubsan_win_weak_interception.cpp",
-            // "lib/ubsan_minimal/ubsan_minimal_handlers.cpp",
         },
         .flags = cxxflags,
     });
+    // lib.addCSourceFiles(.{
+    //     .root = dep.path("lib/ubsan_minimal"),
+    //     .files = &.{
+    //         "ubsan_minimal_handlers.cpp",
+    //     },
+    //     .flags = cxxflags,
+    // });
 }
 
 pub fn buildRTSan(b: *std.Build, lib: *std.Build.Step.Compile) void {
@@ -337,13 +411,13 @@ pub fn buildRTSan(b: *std.Build, lib: *std.Build.Step.Compile) void {
         },
         .flags = cxxflags,
     });
-    buildInterception(lib, dep);
-    buildSanCommon(lib, dep);
     if (lib.rootModuleTarget().abi != .msvc) {
         lib.linkLibCpp();
     } else {
         lib.linkLibC();
     }
+    buildInterception(lib, dep);
+    buildSanCommon(lib, dep);
 }
 
 const cxxflags = &.{

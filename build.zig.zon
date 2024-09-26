@@ -29,6 +29,7 @@
         },
     },
     .paths = .{
+        "bindings",
         "build.zig",
         "build.zig.zon",
         "LICENSE",
