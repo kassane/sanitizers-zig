@@ -17,6 +17,12 @@ This is a collection of sanitizers for Zig. It is a work in progress.
 - [x] LeakSanitizer
 - [x] RealtimeSanitizer (LLVM 20)
 
+## Supported Platforms
+
+- [x] Linux (GNU|Musl)
+- [ ] Windows
+- [ ] macOS
+
 
 ## Experimental Real-time Sanitizer (LLVM 20)
 
@@ -50,7 +56,7 @@ rtsan
 error: the following command exited with error code 1:
 ```
 
-#### References
+### References
 
 - official-doc: https://clang.llvm.org/docs/RealtimeSanitizer.html
 - base: https://github.com/realtime-sanitizer/rtsan
