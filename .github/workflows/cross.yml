@@ -31,5 +31,5 @@ jobs:
       - name: Build Summary ${{ matrix.targets }}
         run: zig build --build-file $PWD/tests/build.zig --summary all -freference-trace -Dtarget=${{ matrix.targets }}
       - name: Run ${{ matrix.targets }}
-        if: ${{ failure() }}
+        if: ${{ success() }}
         run: zig build rtsan --build-file $PWD/tests/build.zig --summary all -freference-trace -Dtarget=${{ matrix.targets }}

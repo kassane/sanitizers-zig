@@ -31,7 +31,7 @@ jobs:
       - name: Build
         run: zig build --build-file $PWD/tests/build.zig --summary all -freference-trace
       - name: Run
-        if: ${{ failure() }}
+        if: ${{ success() }}
         run: |
             zig build rtsan --build-file $PWD/tests/build.zig -freference-trace
             zig build asan --build-file $PWD/tests/build.zig -freference-trace
