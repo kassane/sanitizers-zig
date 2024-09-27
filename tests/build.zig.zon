@@ -6,8 +6,8 @@
             .path = "..",
         },
         .@"compiler-rt" = .{
-            .url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.0/compiler-rt-19.1.0.src.tar.xz",
-            .hash = "1220c8a83cf97bac4d7c1515c95cf9108dfb2fe8f0633da29085146fccb510d76097",
+            .url = "git+https://github.com/kassane/sanitizers-zig#compiler-rt",
+            .hash = "1220768c90d01b50340ecec58520f1d968accf04ec04d83cddd79444e33d218bad87",
         },
     },
     .paths = .{""},

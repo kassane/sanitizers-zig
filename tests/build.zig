@@ -19,6 +19,7 @@ pub fn build(b: *std.Build) void {
             .name = "test-asan",
             .target = target,
             .optimize = optimize,
+            .root_source_file = b.path("lib/stacktrace.zig"),
         });
         exe.addCSourceFile(.{
             .file = b.path("app/test.cc"),
@@ -37,6 +38,7 @@ pub fn build(b: *std.Build) void {
             .name = "test-lsan",
             .target = target,
             .optimize = optimize,
+            .root_source_file = b.path("lib/stacktrace.zig"),
         });
         exe.addCSourceFile(.{
             .file = b.path("app/test.cc"),
@@ -55,6 +57,7 @@ pub fn build(b: *std.Build) void {
             .name = "test-rtsan",
             .target = target,
             .optimize = optimize,
+            .root_source_file = b.path("lib/stacktrace.zig"),
         });
         exe.addObject(zigobj);
         exe.addCSourceFile(.{

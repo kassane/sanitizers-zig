@@ -119,9 +119,7 @@ pub fn buildASan(b: *std.Build, lib: *std.Build.Step.Compile) void {
             "ubsan_type_hash_itanium.cpp",
             "ubsan_type_hash_win.cpp",
             "ubsan_value.cpp",
-            "ubsan_win_dll_thunk.cpp",
-            "ubsan_win_dynamic_runtime_thunk.cpp",
-            "ubsan_win_weak_interception.cpp",
+            "ubsan_win_runtime_thunk.cpp",
         },
         .flags = cxxflags,
     });
@@ -405,9 +403,11 @@ pub fn buildRTSan(b: *std.Build, lib: *std.Build.Step.Compile) void {
         .files = &.{
             "rtsan.cpp",
             "rtsan_context.cpp",
+            "rtsan_diagnostics.cpp",
+            "rtsan_flags.cpp",
             "rtsan_interceptors.cpp",
             "rtsan_preinit.cpp",
-            "rtsan_stack.cpp",
+            "rtsan_stats.cpp",
         },
         .flags = cxxflags,
     });
